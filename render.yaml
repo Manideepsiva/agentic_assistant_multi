@@ -1,4 +1,4 @@
-# One-click deployment config for Render (https://render.com)
+
 services:
   - type: web
     name: agentic-multimodal-assistant
@@ -7,4 +7,4 @@ services:
     healthCheckPath: /api/health
     envVars:
       - key: GROQ_API_KEY
-        sync: false        # set this secret in the Render dashboard
+        sync: false       
