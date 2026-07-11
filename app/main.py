@@ -199,7 +199,5 @@ async def chat_stream(
                                       "X-Accel-Buffering": "no"})
 
 
-# Built by `npm run build` in frontend/ (vite.config.js outputs here). html=True
-# serves index.html for "/" and any unmatched path falls through to a 404,
-# which is fine since this is a single-page app with no client-side routing.
+
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
