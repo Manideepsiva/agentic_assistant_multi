@@ -110,12 +110,14 @@ def plan_node(state: AgentState) -> AgentState:
     # anyway." This is enforced in code instead: if the previous turn was
     # itself a clarify question, this turn is never allowed to clarify again,
     # no matter what the model decides — it must give its best-effort answer.
+    force_final_answer = False
     if plan.action == "clarify" and state.get("clarification_pending"):
         logger.info("Overriding repeat clarify request; forcing best-effort answer instead.")
         trace.append(TraceEvent(
             stage="plan", title="Clarification already requested once",
             detail="Not asking again — proceeding with a best-effort answer instead.",
             status="info"))
+        force_final_answer = True
         plan = AgentPlan(action="execute", steps=[
             PlanStep(
                 tool="answer_question",
@@ -141,7 +143,7 @@ def plan_node(state: AgentState) -> AgentState:
         for i, step in enumerate(plan.steps):
             trace.append(TraceEvent(stage="plan", title=f"Step {i}: {step.tool}",
                                     detail=step.reason, status="info"))
-    return {"plan": plan, "trace": trace}
+    return {"plan": plan, "trace": trace, "force_final_answer": force_final_answer}
 
 
 def route_after_plan(state: AgentState) -> str:
@@ -170,7 +172,10 @@ def _build_args(tool_name: str, step: PlanStep, step_index: int, outputs: list[s
     if tool_name == "explain_code":
         return {"code": _content_for_step(step, step_index, outputs, state), "question": step.question or ""}
     if tool_name == "answer_question":
-        return {"question": step.question or state.get("query", ""), "context": _context_block(state)}
+        history = _history_block(state)
+        context = _context_block(state)
+        full_context = context if history == "(none)" else f"Conversation so far:\n{history}\n\n{context}"
+        return {"question": step.question or state.get("query", ""), "context": full_context}
     if tool_name == "compare_inputs":
         return {"question": step.question or state.get("query", ""), "labeled_contents": _context_block(state)}
     return {}
@@ -205,6 +210,24 @@ def execute_node(state: AgentState) -> AgentState:
     return {"step_outputs": outputs, "trace": trace}
 
 
+_NO_MORE_QUESTIONS = (
+    "\n\nHARD CONSTRAINT FOR THIS RESPONSE: the user already declined to provide "
+    "more clarity after being asked once. Your response MUST NOT ask another "
+    "question, request clarification, or end with a question mark soliciting "
+    "more information from the user — not even a soft/implicit one like "
+    "'let me know if...' or 'could you tell me...'. Commit to a best-effort "
+    "interpretation and answer it directly, OR plainly state you don't have "
+    "enough information and briefly say what would be needed — as a "
+    "statement, not a question — then stop."
+)
+
+
+def _synthesizer_system(state: AgentState) -> str:
+    if state.get("force_final_answer"):
+        return SYNTHESIZER_SYSTEM + _NO_MORE_QUESTIONS
+    return SYNTHESIZER_SYSTEM
+
+
 def synthesize_node(state: AgentState) -> AgentState:
     trace = state.get("trace", [])
     steps_block = "\n\n".join(
@@ -215,9 +238,10 @@ def synthesize_node(state: AgentState) -> AgentState:
     llm = get_llm()
     answer = llm.invoke(
         [
-            SystemMessage(content=SYNTHESIZER_SYSTEM),
+            SystemMessage(content=_synthesizer_system(state)),
             HumanMessage(content=(
                 f"User goal: {state.get('query') or '(implicit from uploads)'}\n\n"
+                f"Conversation history:\n{_history_block(state)}\n\n"
                 f"Extracted inputs (metadata + content):\n{_context_block(state, per_item_limit=4000)}\n\n"
                 f"Tool outputs:\n{steps_block}"
             )),
@@ -239,9 +263,10 @@ def stream_synthesize(state: AgentState):
     llm = get_llm()
     for chunk in llm.stream(
         [
-            SystemMessage(content=SYNTHESIZER_SYSTEM),
+            SystemMessage(content=_synthesizer_system(state)),
             HumanMessage(content=(
                 f"User goal: {state.get('query') or '(implicit from uploads)'}\n\n"
+                f"Conversation history:\n{_history_block(state)}\n\n"
                 f"Extracted inputs (metadata + content):\n{_context_block(state, per_item_limit=4000)}\n\n"
                 f"Tool outputs:\n{steps_block}"
             )),
