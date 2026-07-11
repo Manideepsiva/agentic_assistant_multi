@@ -1,4 +1,4 @@
-"""Bonus: rough token/cost estimator shown in the UI before/with each run.
+"""
 
 Uses the ~4 chars-per-token heuristic (good enough for a pre-execution estimate)
 so we don't need a tokenizer dependency at request time.
