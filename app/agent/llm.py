@@ -1,4 +1,4 @@
-"""Single place to construct Groq chat models."""
+
 from functools import lru_cache
 
 from langchain_groq import ChatGroq
