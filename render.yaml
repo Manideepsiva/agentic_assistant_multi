@@ -2,7 +2,7 @@ services:
   - type: web
     name: agentic-multimodal-assistant
     env: docker
-    plan: starter
+    plan: free
     healthCheckPath: /api/health
     envVars:
       - key: GROQ_API_KEY
