@@ -3,8 +3,8 @@
 Graph:  plan --(clarify)--> END
           \\--(execute)--> execute_tools --> synthesize --> END
 
-Ingestion happens before the graph (in the API layer) so extracted content can
-be cached per session and reused across a clarification round-trip.
+
+
 """
 from __future__ import annotations
 
