@@ -17,22 +17,7 @@ class ExtractedItem(BaseModel):
     meta: dict[str, Any] = Field(default_factory=dict)  # pages, duration, urls...
 
 
-# Every field is a plain, concrete type — no free-form dict. An earlier
-# version used `args: dict[str, Any]`, which is unreliable for structured /
-# tool-calling output: nothing constrains what goes in it, which both blew
-# through completion-token budgets under raw JSON mode and triggered outright
-# `tool_use_failed` errors under tool-calling mode. Each tool only ever needs
-# a small fixed set of things from the model, so those are named explicitly.
-#
-# Critically, none of these fields ever carries file content itself —
-# `input_source` is a closed choice ("context" or "previous_step"), and the
-# executor substitutes the real extracted content or real prior tool output
-# deterministically. The model can never author fabricated "content" that
-# masquerades as the real thing.
-#
-# (Kept as a comment, not a docstring: Pydantic serializes docstrings into
-# the JSON schema sent to the model on every planning call, so a long one
-# here would waste tokens and could itself add confusion.)
+
 class PlanStep(BaseModel):
     """One planned tool call."""
 
