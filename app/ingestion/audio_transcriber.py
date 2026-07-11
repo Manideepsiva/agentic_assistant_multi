@@ -10,15 +10,6 @@ from app.schemas import ExtractedItem
 
 logger = logging.getLogger(__name__)
 
-# Groq (like OpenAI) infers the audio codec from the filename's extension on
-# the multipart upload — NOT from the browser's declared MIME type. If the
-# uploaded filename has a misleading or double extension (e.g. a file named
-# "voice.m4a.mpeg" — the actual bytes are AAC/M4A, but the last extension
-# ".mpeg" gets picked up and told to Whisper as if it were MP3/MPEG audio),
-# the decoder is handed the wrong format hint and produces garbled or
-# hallucinated text instead of failing loudly. We fix this by deriving the
-# extension from the browser's actual MIME type whenever we recognize it,
-# and only falling back to the original filename when we don't.
 MIME_TO_EXT = {
     "audio/mpeg": ".mp3",
     "audio/mp3": ".mp3",
@@ -42,12 +33,6 @@ def _safe_filename(original_filename: str, mime_type: str) -> str:
     if ext:
         return f"upload{ext}"
 
-    # MIME type missing or unrecognized. Only trust the filename's own
-    # trailing extension if it's an unambiguous, single-purpose audio
-    # extension — deliberately excluding container-y extensions like .mpeg/
-    # .mp4/.mpga, since those are exactly what shows up as a misleading
-    # trailing suffix on a double-extension filename (e.g. "voice.m4a.mpeg",
-    # where the real codec is m4a, not whatever ".mpeg" would suggest).
     dot = original_filename.rfind(".")
     orig_ext = original_filename[dot:].lower() if dot != -1 else ""
     if orig_ext in KNOWN_AUDIO_EXT:
