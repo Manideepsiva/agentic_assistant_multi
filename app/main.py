@@ -57,7 +57,7 @@ def _session(session_id: str | None) -> tuple[str, dict]:
         sess["ts"] = now
         return session_id, sess
     sid = session_id or uuid.uuid4().hex[:12]
-    SESSIONS[sid] = {"history": [], "extracted": [], "ts": now}
+    SESSIONS[sid] = {"history": [], "extracted": [], "ts": now, "awaiting_clarification": False}
     return sid, SESSIONS[sid]
 
 
@@ -83,6 +83,7 @@ def _prepare_state(sid: str, sess: dict, query: str,
         "history": list(sess["history"]),
         "extracted": list(sess["extracted"]),
         "trace": list(ingest_trace),
+        "clarification_pending": sess.get("awaiting_clarification", False),
     }
     return state, ingest_trace
 
@@ -115,6 +116,7 @@ async def chat(
                             extracted=state["extracted"], trace=state["trace"])
 
     sess["history"].append({"role": "assistant", "content": result.get("answer", "")})
+    sess["awaiting_clarification"] = result.get("kind") == "clarify"
     cost = estimate_cost(query, state["extracted"], result.get("plan"))
     return ChatResponse(
         session_id=sid,
@@ -169,6 +171,7 @@ async def chat_stream(
             if plan.action == "clarify":
                 q = plan.clarify_question or "Could you clarify what you'd like me to do?"
                 sess["history"].append({"role": "assistant", "content": q})
+                sess["awaiting_clarification"] = True
                 yield sse({"type": "done", "kind": "clarify", "answer": q})
                 return
 
@@ -185,6 +188,7 @@ async def chat_stream(
                 yield sse({"type": "token", "text": token})
             answer = "".join(answer_parts).strip()
             sess["history"].append({"role": "assistant", "content": answer})
+            sess["awaiting_clarification"] = False
             yield sse({"type": "trace", "event": TraceEvent(
                 stage="synthesize", title="Composed final answer",
                 detail=f"{len(answer)} chars").model_dump()})
@@ -199,5 +203,7 @@ async def chat_stream(
                                       "X-Accel-Buffering": "no"})
 
 
-
+# Built by `npm run build` in frontend/ (vite.config.js outputs here). html=True
+# serves index.html for "/" and any unmatched path falls through to a 404,
+# which is fine since this is a single-page app with no client-side routing.
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
