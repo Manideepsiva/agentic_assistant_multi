@@ -1,5 +1,4 @@
-"""Routes each uploaded file to the right extractor and never lets one bad
-file kill the whole request (graceful degradation -> partial results)."""
+
 from __future__ import annotations
 
 import logging
