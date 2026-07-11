@@ -26,24 +26,6 @@ def get_planner_llm() -> ChatGroq:
 @lru_cache
 def get_planner_chain():
     """Planner as a tool-calling structured-output chain.
-
-    We used to force raw JSON mode (response_format=json_object), which asks
-    the model to freely write JSON text. That mode is unconstrained: if the
-    model rambles even slightly (a longer "reason" field, stray commentary),
-    it can run past its token ceiling before the JSON closes — and Groq's
-    json_object mode is all-or-nothing, rejecting the whole response instead
-    of returning what it has. Raising max_tokens only delayed that failure.
-
-    Tool-calling structured output is different: the model fills in a
-    strictly-typed function signature (AgentPlan's exact fields) and stops as
-    soon as they're complete, rather than free-writing text. This is the
-    reliable path Groq/Llama recommend for structured data, and it's what
-    actually fixes the "max completion tokens reached" failures rather than
-    just postponing them.
-
-    include_raw=True so callers can distinguish "model refused/failed to
-    produce a valid call" from a normal successful plan, without relying on
-    exceptions for control flow.
     """
     return get_planner_llm().with_structured_output(
         AgentPlan, method="function_calling", include_raw=True
