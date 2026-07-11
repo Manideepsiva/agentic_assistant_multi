@@ -1,7 +1,4 @@
-"""Central configuration. Groq only — every model call in this app goes to
-Groq's API. All settings come from environment variables; .env is loaded
-automatically so `docker run --env-file .env` or a local .env just works.
-"""
+
 import os
 from functools import lru_cache
 
