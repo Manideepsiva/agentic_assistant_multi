@@ -1,12 +1,11 @@
-# ---- Stage 1: build the React frontend ----
 FROM node:20-slim AS frontend-build
 WORKDIR /frontend
 COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm install --no-audit --no-fund
 COPY frontend/ .
-RUN npm run build          # outputs to ../static (see frontend/vite.config.js)
+RUN npm run build          
 
-# ---- Stage 2: Python backend + built frontend ----
+
 FROM python:3.12-slim
 
 # System dependencies:
@@ -25,5 +24,5 @@ COPY app ./app
 COPY --from=frontend-build /static ./static
 
 EXPOSE 8000
-# $PORT is honoured for Render / Cloud Run style platforms; defaults to 8000.
+
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
