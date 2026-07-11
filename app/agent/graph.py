@@ -3,8 +3,8 @@
 Graph:  plan --(clarify)--> END
           \\--(execute)--> execute_tools --> synthesize --> END
 
-
-
+Ingestion happens before the graph (in the API layer) so extracted content can
+be cached per session and reused across a clarification round-trip.
 """
 from __future__ import annotations
 
@@ -103,6 +103,33 @@ def plan_node(state: AgentState) -> AgentState:
                               "Planner output was malformed")
     else:
         plan = parsed
+
+    # HARD CAP: never clarify twice in a row. Relying on prompt wording alone
+    # to make the model stop asking wasn't reliable in practice — it kept
+    # re-asking even after the user explicitly said "don't ask, just answer
+    # anyway." This is enforced in code instead: if the previous turn was
+    # itself a clarify question, this turn is never allowed to clarify again,
+    # no matter what the model decides — it must give its best-effort answer.
+    if plan.action == "clarify" and state.get("clarification_pending"):
+        logger.info("Overriding repeat clarify request; forcing best-effort answer instead.")
+        trace.append(TraceEvent(
+            stage="plan", title="Clarification already requested once",
+            detail="Not asking again — proceeding with a best-effort answer instead.",
+            status="info"))
+        plan = AgentPlan(action="execute", steps=[
+            PlanStep(
+                tool="answer_question",
+                question=(
+                    f"The user's request was ambiguous and they were already asked to "
+                    f"clarify once. Recent conversation:\n{_history_block(state)}\n\n"
+                    f"They did not (or could not) provide more detail. Give the most "
+                    f"helpful best-effort response you can with what's available, or "
+                    f"plainly explain what specific information would be needed — do "
+                    f"not ask another clarifying question."
+                ),
+                reason="user declined to clarify further",
+            )
+        ])
 
     plan.steps = plan.steps[:MAX_STEPS]
     if plan.action == "clarify":

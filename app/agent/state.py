@@ -11,6 +11,7 @@ class AgentState(TypedDict, total=False):
     query: str
     history: list[dict]              # [{"role": "user"|"assistant", "content": str}]
     extracted: list[ExtractedItem]
+    clarification_pending: bool      # True if the previous turn was itself a clarify question
 
     # Planning
     plan: Optional[AgentPlan]
